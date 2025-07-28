@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AG Grid Row Detail - 免費版實現</title>
+    
+    <!-- AG Grid CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.2/styles/ag-grid.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.2/styles/ag-theme-alpine.css">
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .grid-container {
+            height: 600px;
+            width: 100%;
+        }
+        
+        .detail-row {
+            background-color: #f8f9fa;
+            border-left: 3px solid #007bff;
+            padding: 15px;
+            margin: 5px 0;
+        }
+        
+        .detail-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .detail-item {
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .detail-label {
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 5px;
+        }
+        
+        .detail-value {
+            color: #6c757d;
+        }
+        
+        .expand-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .expand-button:hover {
+            background: #0056b3;
+        }
+        
+        .collapse-button {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .collapse-button:hover {
+            background: #c82333;
+        }
+        
+        .method-selector {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .method-button {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 0 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .method-button:hover {
+            background: #218838;
+        }
+        
+        .method-button.active {
+            background: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AG Grid Row Detail 實現 (免費版)</h1>
+        
+        <div class="method-selector">
+            <button class="method-button active" onclick="showMethod1()">方法1: 展開行</button>
+            <button class="method-button" onclick="showMethod2()">方法2: 子表格</button>
+            <button class="method-button" onclick="showMethod3()">方法3: 彈出視窗</button>
+        </div>
+        
+        <div id="grid1" class="grid-container ag-theme-alpine"></div>
+        <div id="grid2" class="grid-container ag-theme-alpine" style="display: none;"></div>
+        <div id="grid3" class="grid-container ag-theme-alpine" style="display: none;"></div>
+    </div>
+
+    <!-- AG Grid JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.2/dist/ag-grid-community.min.js"></script>
+    
+    <script>
+        // 示例數據
+        const sampleData = [
+            {
+                id: 1,
+                name: '張小明',
+                department: '資訊部',
+                position: '軟體工程師',
+                salary: 60000,
+                email: 'ming@company.com',
+                phone: '0912-345-678',
+                address: '台北市信義區',
+                joinDate: '2022-01-15',
+                skills: ['JavaScript', 'React', 'Node.js'],
+                projects: [
+                    { name: '電商平台', status: '進行中', progress: 75 },
+                    { name: 'CRM系統', status: '已完成', progress: 100 }
+                ]
+            },
+            {
+                id: 2,
+                name: '李小華',
+                department: '行銷部',
+                position: '行銷專員',
+                salary: 45000,
+                email: 'hua@company.com',
+                phone: '0923-456-789',
+                address: '台北市大安區',
+                joinDate: '2021-03-20',
+                skills: ['Digital Marketing', 'Google Ads', 'Facebook Ads'],
+                projects: [
+                    { name: '品牌推廣', status: '進行中', progress: 60 },
+                    { name: '社群經營', status: '進行中', progress: 80 }
+                ]
+            },
+            {
+                id: 3,
+                name: '王大強',
+                department: '業務部',
+                position: '業務經理',
+                salary: 70000,
+                email: 'wang@company.com',
+                phone: '0934-567-890',
+                address: '新北市板橋區',
+                joinDate: '2020-05-10',
+                skills: ['Sales', 'Negotiation', 'CRM'],
+                projects: [
+                    { name: '客戶開發', status: '進行中', progress: 90 },
+                    { name: '合約談判', status: '已完成', progress: 100 }
+                ]
+            }
+        ];
+
+        let gridApi1, gridApi2, gridApi3;
+        let expandedRows = new Set();
+
+        // 方法1: 使用展開行的方式
+        function initGrid1() {
+            const columnDefs = [
+                {
+                    headerName: '',
+                    field: 'expand',
+                    width: 80,
+                    cellRenderer: params => {
+                        const isExpanded = expandedRows.has(params.data.id);
+                        return `<button class="${isExpanded ? 'collapse-button' : 'expand-button'}" onclick="toggleRowDetail(${params.data.id})">
+                                    ${isExpanded ? '收合' : '展開'}
+                                </button>`;
+                    }
+                },
+                { headerName: 'ID', field: 'id', width: 80 },
+                { headerName: '姓名', field: 'name', width: 120 },
+                { headerName: '部門', field: 'department', width: 120 },
+                { headerName: '職位', field: 'position', width: 150 },
+                { headerName: '薪資', field: 'salary', width: 100, valueFormatter: params => `$${params.value?.toLocaleString()}` }
+            ];
+
+            const gridOptions = {
+                columnDefs: columnDefs,
+                rowData: generateExpandableData(),
+                defaultColDef: {
+                    resizable: true,
+                    sortable: true,
+                    filter: true
+                },
+                getRowHeight: params => {
+                    return expandedRows.has(params.data.originalData?.id) && params.data.isDetail ? 200 : 50;
+                },
+                onGridReady: params => {
+                    gridApi1 = params.api;
+                }
+            };
+
+            const gridDiv = document.querySelector('#grid1');
+            new agGrid.Grid(gridDiv, gridOptions);
+        }
+
+        // 方法2: 使用子表格的方式
+        function initGrid2() {
+            const columnDefs = [
+                {
+                    headerName: '',
+                    field: 'detail',
+                    width: 80,
+                    cellRenderer: params => {
+                        return `<button class="expand-button" onclick="showSubGrid(${params.data.id})">詳細</button>`;
+                    }
+                },
+                { headerName: 'ID', field: 'id', width: 80 },
+                { headerName: '姓名', field: 'name', width: 120 },
+                { headerName: '部門', field: 'department', width: 120 },
+                { headerName: '職位', field: 'position', width: 150 },
+                { headerName: '薪資', field: 'salary', width: 100, valueFormatter: params => `$${params.value?.toLocaleString()}` }
+            ];
+
+            const gridOptions = {
+                columnDefs: columnDefs,
+                rowData: sampleData,
+                defaultColDef: {
+                    resizable: true,
+                    sortable: true,
+                    filter: true
+                },
+                onGridReady: params => {
+                    gridApi2 = params.api;
+                }
+            };
+
+            const gridDiv = document.querySelector('#grid2');
+            new agGrid.Grid(gridDiv, gridOptions);
+        }
+
+        // 方法3: 使用彈出視窗的方式
+        function initGrid3() {
+            const columnDefs = [
+                {
+                    headerName: '',
+                    field: 'detail',
+                    width: 80,
+                    cellRenderer: params => {
+                        return `<button class="expand-button" onclick="showModal(${params.data.id})">詳細</button>`;
+                    }
+                },
+                { headerName: 'ID', field: 'id', width: 80 },
+                { headerName: '姓名', field: 'name', width: 120 },
+                { headerName: '部門', field: 'department', width: 120 },
+                { headerName: '職位', field: 'position', width: 150 },
+                { headerName: '薪資', field: 'salary', width: 100, valueFormatter: params => `$${params.value?.toLocaleString()}` }
+            ];
+
+            const gridOptions = {
+                columnDefs: columnDefs,
+                rowData: sampleData,
+                defaultColDef: {
+                    resizable: true,
+                    sortable: true,
+                    filter: true
+                },
+                onGridReady: params => {
+                    gridApi3 = params.api;
+                }
+            };
+
+            const gridDiv = document.querySelector('#grid3');
+            new agGrid.Grid(gridDiv, gridOptions);
+        }
+
+        // 生成包含詳細資訊行的數據
+        function generateExpandableData() {
+            const expandableData = [];
+            sampleData.forEach(item => {
+                expandableData.push(item);
+                // 如果該行被展開，添加詳細資訊行
+                if (expandedRows.has(item.id)) {
+                    expandableData.push({
+                        isDetail: true,
+                        originalData: item,
+                        id: `detail-${item.id}`,
+                        name: createDetailContent(item),
+                        department: '',
+                        position: '',
+                        salary: null,
+                        expand: ''
+                    });
+                }
+            });
+            return expandableData;
+        }
+
+        // 創建詳細內容
+        function createDetailContent(data) {
+            return `
+                <div class="detail-row">
+                    <div class="detail-content">
+                        <div class="detail-item">
+                            <div class="detail-label">聯絡資訊</div>
+                            <div class="detail-value">
+                                Email: ${data.email}<br>
+                                電話: ${data.phone}<br>
+                                地址: ${data.address}
+                            </div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">入職資訊</div>
+                            <div class="detail-value">
+                                入職日期: ${data.joinDate}<br>
+                                薪資: $${data.salary.toLocaleString()}
+                            </div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">技能</div>
+                            <div class="detail-value">
+                                ${data.skills.join(', ')}
+                            </div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">專案</div>
+                            <div class="detail-value">
+                                ${data.projects.map(p => `${p.name} (${p.status}) - ${p.progress}%`).join('<br>')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 切換行詳細資訊
+        function toggleRowDetail(id) {
+            if (expandedRows.has(id)) {
+                expandedRows.delete(id);
+            } else {
+                expandedRows.add(id);
+            }
+            
+            // 重新設置數據
+            gridApi1.setRowData(generateExpandableData());
+        }
+
+        // 顯示子表格
+        function showSubGrid(id) {
+            const data = sampleData.find(item => item.id === id);
+            if (data) {
+                alert(`詳細資訊 - ${data.name}\n\nEmail: ${data.email}\n電話: ${data.phone}\n地址: ${data.address}\n入職日期: ${data.joinDate}\n技能: ${data.skills.join(', ')}\n\n專案:\n${data.projects.map(p => `- ${p.name} (${p.status}) - ${p.progress}%`).join('\n')}`);
+            }
+        }
+
+        // 顯示彈出視窗
+        function showModal(id) {
+            const data = sampleData.find(item => item.id === id);
+            if (data) {
+                const modalContent = `
+                    <div style="background: white; padding: 20px; border-radius: 8px; max-width: 600px; margin: 50px auto; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+                        <h3>員工詳細資訊 - ${data.name}</h3>
+                        ${createDetailContent(data)}
+                        <div style="text-align: center; margin-top: 20px;">
+                            <button onclick="closeModal()" style="background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">關閉</button>
+                        </div>
+                    </div>
+                `;
+                
+                const modal = document.createElement('div');
+                modal.id = 'modal';
+                modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;';
+                modal.innerHTML = modalContent;
+                document.body.appendChild(modal);
+            }
+        }
+
+        // 關閉彈出視窗
+        function closeModal() {
+            const modal = document.getElementById('modal');
+            if (modal) {
+                modal.remove();
+            }
+        }
+
+        // 方法切換函數
+        function showMethod1() {
+            document.getElementById('grid1').style.display = 'block';
+            document.getElementById('grid2').style.display = 'none';
+            document.getElementById('grid3').style.display = 'none';
+            updateActiveButton(0);
+        }
+
+        function showMethod2() {
+            document.getElementById('grid1').style.display = 'none';
+            document.getElementById('grid2').style.display = 'block';
+            document.getElementById('grid3').style.display = 'none';
+            updateActiveButton(1);
+        }
+
+        function showMethod3() {
+            document.getElementById('grid1').style.display = 'none';
+            document.getElementById('grid2').style.display = 'none';
+            document.getElementById('grid3').style.display = 'block';
+            updateActiveButton(2);
+        }
+
+        function updateActiveButton(activeIndex) {
+            const buttons = document.querySelectorAll('.method-button');
+            buttons.forEach((btn, index) => {
+                btn.classList.toggle('active', index === activeIndex);
+            });
+        }
+
+        // 初始化所有表格
+        document.addEventListener('DOMContentLoaded', function() {
+            initGrid1();
+            initGrid2();
+            initGrid3();
+        });
+    </script>
+</body>
+</html>
